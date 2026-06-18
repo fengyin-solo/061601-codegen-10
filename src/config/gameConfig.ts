@@ -152,6 +152,14 @@ export const gameConfig: GameConfig = {
       description: '天空突然下起了大雨，你看到林小雨站在屋檐下，似乎没带伞。',
       characterId: 'linxiaoyu',
       triggerCondition: { minDay: 3, timeOfDay: 'evening', minAffinity: 20, characterId: 'linxiaoyu' },
+      clues: [
+        {
+          id: 'clue_rain_1',
+          title: '雨天预感',
+          hint: '最近天气变化无常，林小雨似乎经常看窗外...',
+          partialCondition: { minDay: 2, minAffinity: 10, characterId: 'linxiaoyu' }
+        }
+      ],
       choices: [
         {
           id: 'share_umbrella',
@@ -178,6 +186,14 @@ export const gameConfig: GameConfig = {
       description: '你路过咖啡馆，发现灯还亮着。苏菲一个人在店里，看起来有些疲惫。',
       characterId: 'sufei',
       triggerCondition: { minDay: 5, timeOfDay: 'night', minAffinity: 30, characterId: 'sufei' },
+      clues: [
+        {
+          id: 'clue_cafe_1',
+          title: '深夜灯光',
+          hint: '咖啡馆似乎总开到很晚，苏菲一个人忙得过来吗...',
+          partialCondition: { minDay: 3, minAffinity: 15, characterId: 'sufei' }
+        }
+      ],
       choices: [
         {
           id: 'help',
@@ -206,6 +222,20 @@ export const gameConfig: GameConfig = {
       description: '在公园的角落里，你看到一个安静的女生独自坐在长椅上。她似乎注意到了你，微微点了点头。',
       characterId: 'yeqing',
       triggerCondition: { minDay: 7, minAffinity: 40 },
+      clues: [
+        {
+          id: 'clue_mystery_1',
+          title: '校园传闻',
+          hint: '听说学校来了一个新同学，好像总是一个人...',
+          partialCondition: { minDay: 5 }
+        },
+        {
+          id: 'clue_mystery_2',
+          title: '神秘身影',
+          hint: '最近在公园似乎常看到一个安静的身影...',
+          partialCondition: { minDay: 6, minAffinity: 25 }
+        }
+      ],
       choices: [
         {
           id: 'approach',
@@ -233,6 +263,20 @@ export const gameConfig: GameConfig = {
       description: '你想起今天是林小雨的生日，要准备什么惊喜吗？',
       characterId: 'linxiaoyu',
       triggerCondition: { minDay: 14, minAffinity: 50, characterId: 'linxiaoyu' },
+      clues: [
+        {
+          id: 'clue_birthday_1',
+          title: '特别的日子',
+          hint: '好像快到小雨的生日了，她最近看起来有些期待...',
+          partialCondition: { minDay: 12, minAffinity: 30, characterId: 'linxiaoyu' }
+        },
+        {
+          id: 'clue_birthday_2',
+          title: '生日倒计时',
+          hint: '小雨的生日快到了，要不要准备点什么呢？',
+          partialCondition: { minDay: 13, minAffinity: 40, characterId: 'linxiaoyu' }
+        }
+      ],
       choices: [
         {
           id: 'big_surprise',
@@ -260,6 +304,14 @@ export const gameConfig: GameConfig = {
       title: '两人的邀约',
       description: '林小雨和苏菲同时邀请你周末出去，你该怎么办？',
       triggerCondition: { minDay: 10, minAffinity: 35 },
+      clues: [
+        {
+          id: 'clue_conflict_1',
+          title: '微妙的关系',
+          hint: '最近和小雨、苏菲都走得很近，会不会出什么问题...',
+          partialCondition: { minDay: 8, minAffinity: 25 }
+        }
+      ],
       choices: [
         {
           id: 'choose_xiaoyu',

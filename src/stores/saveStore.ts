@@ -56,6 +56,8 @@ export const useSaveStore = defineStore('save', () => {
       flags: gameStore.flags,
       triggeredEvents: gameStore.triggeredEvents,
       collectedCards: gameStore.collectedCards,
+      collectedClues: gameStore.collectedClues,
+      newClueCount: gameStore.newClueCount,
       logs: gameStore.logs,
       history: gameStore.history,
       darkMode: gameStore.darkMode
@@ -75,6 +77,8 @@ export const useSaveStore = defineStore('save', () => {
       gameStore.flags = state.flags
       gameStore.triggeredEvents = state.triggeredEvents
       gameStore.collectedCards = state.collectedCards
+      gameStore.collectedClues = state.collectedClues || []
+      gameStore.newClueCount = state.newClueCount || 0
       gameStore.logs = state.logs
       gameStore.history = state.history
       gameStore.darkMode = state.darkMode

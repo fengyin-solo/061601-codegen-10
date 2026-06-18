@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { TimeOfDay, ActionType, GameEventConfig, EventChoice } from '../types/game'
+import type { TimeOfDay, ActionType, GameEventConfig, EventChoice, EventClueConfig } from '../types/game'
 import gameConfig from '../config/gameConfig'
 import {
   clamp,
@@ -31,6 +31,18 @@ export interface LogEntry {
   timestamp: number
 }
 
+export interface ClueRecord {
+  id: string
+  eventId: string
+  eventTitle: string
+  title: string
+  hint: string
+  characterId?: string
+  revealedDay: number
+  revealedTime: TimeOfDay
+  dismissed: boolean
+}
+
 export interface HistorySnapshot {
   day: number
   timeSlot: TimeOfDay
@@ -52,6 +64,8 @@ export const useGameStore = defineStore('game', () => {
   const currentEvent = ref<GameEventConfig | null>(null)
   const showEventModal = ref(false)
   const darkMode = ref(false)
+  const collectedClues = ref<ClueRecord[]>([])
+  const newClueCount = ref(0)
 
   const characters = ref<CharacterState[]>(
     gameConfig.characters.map(c => ({
@@ -73,6 +87,14 @@ export const useGameStore = defineStore('game', () => {
     characters.value.filter(c => c.unlocked)
   )
 
+  const activeClues = computed(() =>
+    collectedClues.value.filter(c => !c.dismissed)
+  )
+
+  const dismissedClues = computed(() =>
+    collectedClues.value.filter(c => c.dismissed)
+  )
+
   const currentCharacter = computed(() =>
     characters.value.find(c => c.id === selectedCharacterId.value) || null
   )
@@ -91,6 +113,123 @@ export const useGameStore = defineStore('game', () => {
       characterId,
       timestamp: Date.now()
     })
+  }
+
+  function checkAndRevealClues() {
+    gameConfig.events.forEach(event => {
+      if (!event.clues || event.clues.length === 0) return
+      if (event.once && triggeredEvents.value.includes(event.id)) return
+
+      const fullyMet = checkConditionFullyMet(event.triggerCondition)
+      if (fullyMet) return
+
+      event.clues.forEach(clue => {
+        if (collectedClues.value.some(c => c.id === clue.id)) return
+        if (!checkPartialCondition(clue)) return
+
+        const record: ClueRecord = {
+          id: clue.id,
+          eventId: event.id,
+          eventTitle: event.title,
+          title: clue.title,
+          hint: clue.hint,
+          characterId: clue.partialCondition.characterId || event.characterId,
+          revealedDay: day.value,
+          revealedTime: timeSlot.value,
+          dismissed: false
+        }
+        collectedClues.value.push(record)
+        newClueCount.value++
+        addLog('story', `🔔 获得线索：${clue.title} —— ${clue.hint}`, record.characterId)
+      })
+    })
+  }
+
+  function checkConditionFullyMet(cond: GameEventConfig['triggerCondition']): boolean {
+    if (cond.minDay !== undefined && day.value < cond.minDay) return false
+    if (cond.maxDay !== undefined && day.value > cond.maxDay) return false
+    if (cond.timeOfDay !== undefined && timeSlot.value !== cond.timeOfDay) return false
+
+    if (cond.characterId) {
+      const charState = getCharacterState(cond.characterId)
+      if (!charState || !charState.unlocked) return false
+      if (cond.minAffinity !== undefined && charState.affinity < cond.minAffinity) return false
+      if (cond.maxAffinity !== undefined && charState.affinity > cond.maxAffinity) return false
+    }
+
+    if (cond.requiredFlags) {
+      if (!cond.requiredFlags.every(f => flags.value.includes(f))) return false
+    }
+
+    return true
+  }
+
+  function checkPartialCondition(clue: EventClueConfig): boolean {
+    const cond = clue.partialCondition
+
+    if (cond.minDay !== undefined && day.value < cond.minDay) return false
+
+    if (cond.characterId) {
+      const charState = getCharacterState(cond.characterId)
+      if (!charState || !charState.unlocked) return false
+      if (cond.minAffinity !== undefined && charState.affinity < cond.minAffinity) return false
+    } else {
+      if (cond.minAffinity !== undefined) {
+        const anyMeets = characters.value.some(c =>
+          c.unlocked && c.affinity >= cond.minAffinity!
+        )
+        if (!anyMeets) return false
+      }
+    }
+
+    if (cond.requiredFlags) {
+      if (!cond.requiredFlags.every(f => flags.value.includes(f))) return false
+    }
+
+    return true
+  }
+
+  function dismissClue(clueId: string) {
+    const clue = collectedClues.value.find(c => c.id === clueId)
+    if (clue) {
+      clue.dismissed = true
+    }
+  }
+
+  function clearNewClueCount() {
+    newClueCount.value = 0
+  }
+
+  function getClueProgress(clueId: string): { current: number; target: number; label: string } {
+    const clue = gameConfig.events
+      .flatMap(e => e.clues || [])
+      .find(c => c.id === clueId)
+    if (!clue) return { current: 0, target: 1, label: '' }
+
+    const event = gameConfig.events.find(e => e.clues?.some(c => c.id === clueId))
+    if (!event) return { current: 0, target: 1, label: '' }
+
+    const cond = event.triggerCondition
+    const parts: { current: number; target: number; label: string }[] = []
+
+    if (cond.minDay !== undefined) {
+      parts.push({ current: Math.min(day.value, cond.minDay), target: cond.minDay, label: `天数 ${day.value}/${cond.minDay}` })
+    }
+
+    if (cond.characterId && cond.minAffinity !== undefined) {
+      const charState = getCharacterState(cond.characterId)
+      const affinity = charState?.affinity || 0
+      parts.push({ current: Math.min(affinity, cond.minAffinity), target: cond.minAffinity, label: `好感 ${affinity}/${cond.minAffinity}` })
+    }
+
+    if (parts.length === 0) return { current: 1, target: 1, label: '条件接近满足' }
+
+    const totalCurrent = parts.reduce((s, p) => s + p.current / p.target, 0) / parts.length
+    return {
+      current: totalCurrent,
+      target: 1,
+      label: parts.map(p => p.label).join(' · ')
+    }
   }
 
   function saveHistory() {
@@ -174,6 +313,7 @@ export const useGameStore = defineStore('game', () => {
     } else {
       timeSlot.value = nextSlot
     }
+    checkAndRevealClues()
     checkAndTriggerEvent()
   }
 
@@ -426,6 +566,8 @@ export const useGameStore = defineStore('game', () => {
     selectedCharacterId.value = null
     currentEvent.value = null
     showEventModal.value = false
+    collectedClues.value = []
+    newClueCount.value = 0
 
     characters.value = gameConfig.characters.map(c => ({
       id: c.id,
@@ -442,6 +584,7 @@ export const useGameStore = defineStore('game', () => {
     logIdCounter = 0
 
     addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
+    checkAndRevealClues()
     checkAndTriggerEvent()
   }
 
@@ -449,6 +592,7 @@ export const useGameStore = defineStore('game', () => {
     if (logs.value.length === 0) {
       addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
     }
+    checkAndRevealClues()
     checkAndTriggerEvent()
   }
 
@@ -470,6 +614,10 @@ export const useGameStore = defineStore('game', () => {
     currentEvent,
     showEventModal,
     darkMode,
+    collectedClues,
+    newClueCount,
+    activeClues,
+    dismissedClues,
     addLog,
     saveHistory,
     rollbackToStep,
@@ -482,6 +630,10 @@ export const useGameStore = defineStore('game', () => {
     toggleDarkMode,
     resetGame,
     initGame,
-    checkAndTriggerEvent
+    checkAndTriggerEvent,
+    checkAndRevealClues,
+    dismissClue,
+    clearNewClueCount,
+    getClueProgress
   }
 })

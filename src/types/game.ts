@@ -54,6 +54,18 @@ export interface EventChoice {
   addCardId?: string
 }
 
+export interface EventClueConfig {
+  id: string
+  title: string
+  hint: string
+  partialCondition: {
+    minAffinity?: number
+    minDay?: number
+    characterId?: string
+    requiredFlags?: string[]
+  }
+}
+
 export interface GameEventConfig {
   id: string
   title: string
@@ -71,6 +83,7 @@ export interface GameEventConfig {
   choices: EventChoice[]
   once: boolean
   priority: number
+  clues?: EventClueConfig[]
 }
 
 export interface ActionConfig {

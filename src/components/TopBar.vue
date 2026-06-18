@@ -7,6 +7,7 @@ const emit = defineEmits<{
   (e: 'toggle-cards'): void
   (e: 'toggle-history'): void
   (e: 'toggle-theme'): void
+  (e: 'toggle-clues'): void
   (e: 'reset'): void
 }>()
 
@@ -40,6 +41,10 @@ const gameStore = useGameStore()
     </div>
 
     <div class="toolbar">
+      <button class="toolbar-btn clue-btn" @click="emit('toggle-clues')" title="事件预告">
+        🔮
+        <span v-if="gameStore.newClueCount > 0" class="clue-badge">{{ gameStore.newClueCount }}</span>
+      </button>
       <button class="toolbar-btn" @click="emit('toggle-cards')" title="卡牌收藏">
         🎴
       </button>
@@ -132,6 +137,33 @@ const gameStore = useGameStore()
 
 .toolbar-btn.reset:hover {
   background: #fee2e2;
+}
+
+.clue-btn {
+  position: relative;
+}
+
+.clue-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 @media (max-width: 768px) {
