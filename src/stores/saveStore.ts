@@ -120,6 +120,7 @@ export const useSaveStore = defineStore('save', () => {
     const success = deserializeGameState(slot.data)
     if (success) {
       gameStore.addLog('system', `📂 已加载存档 ${slotId}`)
+      gameStore.checkAndRevealClues()
       gameStore.checkAndTriggerEvent()
     }
     return success
@@ -149,7 +150,12 @@ export const useSaveStore = defineStore('save', () => {
       const data = localStorage.getItem(AUTOSAVE_KEY)
       if (!data) return false
       const save = JSON.parse(data)
-      return deserializeGameState(save.data)
+      const success = deserializeGameState(save.data)
+      if (success) {
+        gameStore.checkAndRevealClues()
+        gameStore.checkAndTriggerEvent()
+      }
+      return success
     } catch (e) {
       console.error('Failed to load autosave:', e)
       return false

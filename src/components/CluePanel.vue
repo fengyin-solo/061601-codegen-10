@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import gameConfig from '../config/gameConfig'
 import { getTimeLabel } from '../utils/gameUtils'
@@ -11,11 +11,13 @@ const emit = defineEmits<{
 const gameStore = useGameStore()
 const activeTab = ref<'preview' | 'review'>('preview')
 
-gameStore.clearNewClueCount()
+onMounted(() => {
+  gameStore.clearNewClueCount()
+})
 
 const previewClues = computed(() => gameStore.activeClues)
 
-const reviewClues = computed(() => gameStore.dismissedClues)
+const reviewClues = computed(() => gameStore.reviewedClues)
 
 const allClues = computed(() => {
   if (activeTab.value === 'preview') return previewClues.value
@@ -53,6 +55,12 @@ function handleRestore(clueId: string) {
   if (clue) {
     clue.dismissed = false
   }
+}
+
+function getStatusLabel(clue: any): string {
+  if (clue.triggered) return '已触发'
+  if (clue.dismissed) return '已知晓'
+  return ''
 }
 </script>
 
@@ -92,20 +100,33 @@ function handleRestore(clueId: string) {
             v-for="clue in allClues"
             :key="clue.id"
             class="clue-card"
-            :class="{ 'clue-active': !clue.dismissed, 'clue-dismissed': clue.dismissed }"
+            :class="{
+              'clue-active': !clue.dismissed && !clue.triggered,
+              'clue-dismissed': clue.dismissed && !clue.triggered,
+              'clue-triggered': clue.triggered
+            }"
           >
             <div class="clue-top">
               <div class="clue-character" v-if="clue.characterId">
                 <span class="char-emoji">{{ getCharacterAvatar(clue.characterId) }}</span>
                 <span class="char-label">{{ getCharacterName(clue.characterId) }}</span>
               </div>
-              <span class="clue-event-tag">🔮 {{ clue.eventTitle }}</span>
+              <div class="clue-tags">
+                <span class="clue-event-tag">🔮 {{ clue.eventTitle }}</span>
+                <span
+                  v-if="getStatusLabel(clue)"
+                  class="status-tag"
+                  :class="{ 'status-triggered': clue.triggered, 'status-dismissed': clue.dismissed }"
+                >
+                  {{ getStatusLabel(clue) }}
+                </span>
+              </div>
             </div>
 
             <h3 class="clue-title">{{ clue.title }}</h3>
             <p class="clue-hint">{{ clue.hint }}</p>
 
-            <div v-if="!clue.dismissed" class="clue-progress">
+            <div v-if="!clue.triggered && !clue.dismissed" class="clue-progress">
               <div class="progress-bar">
                 <div
                   class="progress-fill clue-progress-fill"
@@ -116,27 +137,30 @@ function handleRestore(clueId: string) {
             </div>
 
             <div class="clue-footer">
-              <span class="clue-time">第{{ clue.revealedDay }}天 {{ getTimeLabel(clue.revealedTime) }}</span>
+              <span class="clue-time">揭示于第{{ clue.revealedDay }}天 {{ getTimeLabel(clue.revealedTime) }}</span>
               <button
-                v-if="!clue.dismissed"
+                v-if="!clue.triggered && !clue.dismissed"
                 class="action-btn dismiss-btn"
                 @click="handleDismiss(clue.id)"
               >
                 已知晓
               </button>
               <button
-                v-else
+                v-else-if="clue.dismissed && !clue.triggered"
                 class="action-btn restore-btn"
                 @click="handleRestore(clue.id)"
               >
                 恢复预告
               </button>
+              <span v-else-if="clue.triggered" class="triggered-note">
+                ✨ 剧情已发生
+              </span>
             </div>
           </div>
 
           <div v-if="allClues.length === 0" class="empty-state">
             <span class="empty-icon">{{ activeTab === 'preview' ? '🔕' : '📭' }}</span>
-            <p>{{ activeTab === 'preview' ? '暂无预告线索，继续探索吧' : '暂无已知晓的线索' }}</p>
+            <p>{{ activeTab === 'preview' ? '暂无预告线索，继续探索吧' : '暂无回看线索' }}</p>
           </div>
         </div>
       </div>
@@ -262,6 +286,17 @@ function handleRestore(clueId: string) {
   opacity: 0.7;
 }
 
+.clue-triggered {
+  background: #f0fdf4;
+  border-color: #86efac;
+  opacity: 0.9;
+}
+
+[data-theme='dark'] .clue-triggered {
+  background: #14532d;
+  border-color: #22c55e;
+}
+
 .clue-top {
   display: flex;
   justify-content: space-between;
@@ -285,12 +320,45 @@ function handleRestore(clueId: string) {
   color: var(--accent-primary);
 }
 
+.clue-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .clue-event-tag {
   font-size: 11px;
   padding: 3px 8px;
   background: var(--accent-light);
   color: var(--accent-primary);
   border-radius: 9999px;
+}
+
+.status-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.status-dismissed {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+[data-theme='dark'] .status-dismissed {
+  background: #374151;
+  color: #d1d5db;
+}
+
+.status-triggered {
+  background: #bbf7d0;
+  color: #166534;
+}
+
+[data-theme='dark'] .status-triggered {
+  background: #166534;
+  color: #bbf7d0;
 }
 
 .clue-title {
@@ -371,6 +439,16 @@ function handleRestore(clueId: string) {
 .restore-btn:hover {
   background: var(--accent-primary);
   color: white;
+}
+
+.triggered-note {
+  font-size: 11px;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+[data-theme='dark'] .triggered-note {
+  color: #4ade80;
 }
 
 .empty-state {

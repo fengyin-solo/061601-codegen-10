@@ -41,6 +41,7 @@ export interface ClueRecord {
   revealedDay: number
   revealedTime: TimeOfDay
   dismissed: boolean
+  triggered: boolean
 }
 
 export interface HistorySnapshot {
@@ -52,6 +53,8 @@ export interface HistorySnapshot {
   flags: string[]
   triggeredEvents: string[]
   collectedCards: string[]
+  collectedClues: ClueRecord[]
+  newClueCount: number
   logs: LogEntry[]
 }
 
@@ -88,11 +91,19 @@ export const useGameStore = defineStore('game', () => {
   )
 
   const activeClues = computed(() =>
-    collectedClues.value.filter(c => !c.dismissed)
+    collectedClues.value.filter(c => !c.dismissed && !c.triggered)
   )
 
   const dismissedClues = computed(() =>
     collectedClues.value.filter(c => c.dismissed)
+  )
+
+  const triggeredClues = computed(() =>
+    collectedClues.value.filter(c => c.triggered)
+  )
+
+  const reviewedClues = computed(() =>
+    collectedClues.value.filter(c => c.dismissed || c.triggered)
   )
 
   const currentCharacter = computed(() =>
@@ -118,7 +129,18 @@ export const useGameStore = defineStore('game', () => {
   function checkAndRevealClues() {
     gameConfig.events.forEach(event => {
       if (!event.clues || event.clues.length === 0) return
-      if (event.once && triggeredEvents.value.includes(event.id)) return
+
+      const eventTriggered = event.once && triggeredEvents.value.includes(event.id)
+
+      if (eventTriggered) {
+        event.clues.forEach(clue => {
+          const existing = collectedClues.value.find(c => c.id === clue.id)
+          if (existing && !existing.triggered) {
+            existing.triggered = true
+          }
+        })
+        return
+      }
 
       const fullyMet = checkConditionFullyMet(event.triggerCondition)
       if (fullyMet) return
@@ -136,7 +158,8 @@ export const useGameStore = defineStore('game', () => {
           characterId: clue.partialCondition.characterId || event.characterId,
           revealedDay: day.value,
           revealedTime: timeSlot.value,
-          dismissed: false
+          dismissed: false,
+          triggered: false
         }
         collectedClues.value.push(record)
         newClueCount.value++
@@ -242,6 +265,8 @@ export const useGameStore = defineStore('game', () => {
       flags: [...flags.value],
       triggeredEvents: [...triggeredEvents.value],
       collectedCards: [...collectedCards.value],
+      collectedClues: JSON.parse(JSON.stringify(collectedClues.value)),
+      newClueCount: newClueCount.value,
       logs: JSON.parse(JSON.stringify(logs.value))
     })
     if (history.value.length > 100) {
@@ -260,6 +285,8 @@ export const useGameStore = defineStore('game', () => {
     flags.value = [...snapshot.flags]
     triggeredEvents.value = [...snapshot.triggeredEvents]
     collectedCards.value = [...snapshot.collectedCards]
+    collectedClues.value = JSON.parse(JSON.stringify(snapshot.collectedClues || []))
+    newClueCount.value = snapshot.newClueCount ?? 0
     logs.value = JSON.parse(JSON.stringify(snapshot.logs))
     history.value = history.value.slice(0, stepIndex)
     addLog('system', `回退到第 ${snapshot.day} 天 ${getTimeLabel(snapshot.timeSlot)}`)
@@ -498,6 +525,16 @@ export const useGameStore = defineStore('game', () => {
     currentEvent.value = event
     showEventModal.value = true
     triggeredEvents.value.push(event.id)
+
+    if (event.clues) {
+      event.clues.forEach(clue => {
+        const existing = collectedClues.value.find(c => c.id === clue.id)
+        if (existing) {
+          existing.triggered = true
+        }
+      })
+    }
+
     addLog('event', `📖 触发事件：${event.title}`, event.characterId)
   }
 
@@ -618,6 +655,8 @@ export const useGameStore = defineStore('game', () => {
     newClueCount,
     activeClues,
     dismissedClues,
+    triggeredClues,
+    reviewedClues,
     addLog,
     saveHistory,
     rollbackToStep,
